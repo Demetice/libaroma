@@ -1,4 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>  
+#include <string.h>  
+#include <dirent.h>  
+#include <unistd.h> 
 #include "aroma.h"
 
 typedef struct tagCanvasRamDataHdr
@@ -13,19 +17,46 @@ typedef struct tagCanvasRamDataHdr
 }LIBAROMA_CANVAS_FILE_HDR, *LIBAROMA_CANVAS_FILE_HDRP;
 
 int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name);
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh);
+int write_single_image_to_file(char *image_name, FILE *file_in, int *all_size);
 
 int main(int argc, char *argv[])
 {
-    if (argc < 3)
+    char dir[] = "./";
+    
+    FILE *fcin = fopen("png_res.c", "w+");
+    if (fcin == NULL)
     {
-        printf("Usage: ./png2ram xxx.png out.h\r\n");
+        fprintf(stderr, "open png_res.c file failed\n");
+        return -1;
+    }
+    
+    FILE *fh = fopen("png_res.h", "w+");
+    if (fh == NULL)
+    {
+        fprintf(stderr, "open png_res.h file failed\n");
+        fclose(fcin);
         return -1;
     }
 
+    fprintf(fcin, "const char png_res[] = {\r\n");
+
+    read_dir_pngs_convert_ram_data(dir, fcin, fh);
+
+    fprintf(fcin, "\r\n};\r\n");
+    
+    fclose(fcin);
+    fclose(fh);
+
+    return 0;
+}
+
+int write_single_image_to_file(char *image_name, FILE *file_in, int *all_size)
+{
     LIBAROMA_STREAMP stream = NULL;
     LIBAROMA_CANVASP canvas = NULL;
 
-    stream = libaroma_stream_file(argv[1]);
+    stream = libaroma_stream_file(image_name);
     if (stream == NULL)
     {
         printf("error in get image stream \r\n");
@@ -42,20 +73,12 @@ int main(int argc, char *argv[])
     printf("load image success W:%d, h:%d, flag:%d, l:%d, s:%d\n", 
                 canvas->w, canvas->h, canvas->flags, canvas->l, canvas->s);
 
-    FILE *file_in = fopen(argv[2], "w+");
-    if (file_in == NULL)
-    {
-        libaroma_canvas_free(canvas);
-        return -4;
-    }
-
-    fprintf(file_in, "const char png_res[] = {\r\n");
+    write_canvas_to_file(canvas, file_in, image_name);
     
-    write_canvas_to_file(canvas, file_in, argv[1]);
-    
-    fprintf(file_in, "\r\n};\r\n");
+    int alpha_flag = (canvas->alpha == NULL) ? 0 : 1;
 
-    fclose(file_in);
+    *all_size = sizeof(LIBAROMA_CANVAS_FILE_HDR) + (sizeof(word) + sizeof(byte) * alpha_flag)*canvas->w*canvas->h;
+
     libaroma_canvas_free(canvas);
     
     return 0;
@@ -143,5 +166,83 @@ int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
         }
     }
 
+    return 0;
+}
+
+byte is_png_file(char *name)
+{
+    int len = strlen(name);
+    //printf("%s : %c%c%c%c\n", name, name[len-4], name[len-3],name[len-2],name[len-1]);
+
+    if ((name[len - 4] == '.')
+    && ( (name[len-3] == 'p') || (name[len-3] == 'P'))
+    && ( (name[len-2] == 'n') || (name[len-2] == 'N'))
+    && ( (name[len-1] == 'g') || (name[len-1] == 'G')))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+void fix_file_name_for_macro(const char *src, char *dst)
+{
+    int len = strlen(src);
+
+    snprintf(dst, 256, "%s", src);
+
+    if (len > 255) len = 255;
+    dst[len - 4] = '\0';
+
+    for(int i = 0; i < len; i++)
+    {
+        if (dst[i] >= 'a' && dst[i] <= 'z')
+        {
+            dst[i] = dst[i] + 'A' - 'a';
+        }
+    }
+
+    return;
+}
+
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
+{   
+    DIR *dir;
+    struct dirent *ptr;
+    int offset = 0, total_size = 0, all_size = 0;
+    char buffer[256];
+
+    if ((dir=opendir(basePath)) == NULL)
+    {
+        perror("Open dir error...");
+        return -1;
+    }
+
+    while ((ptr=readdir(dir)) != NULL)
+    {
+        if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0)    ///current dir OR parrent dir
+        {
+            continue;
+        }   
+        else if(ptr->d_type == 8 && is_png_file(ptr->d_name))    ///file
+        {
+	        printf("%s start convert \n", ptr->d_name);
+            write_single_image_to_file(ptr->d_name, fc, &all_size);
+
+            fix_file_name_for_macro(ptr->d_name, buffer);
+
+            fprintf(fh, "#define RES_PNG_IDX_%s %d\n", buffer, offset);
+            fprintf(fh, "#define RES_PNG_OFFSET_%s %d\n", buffer, total_size);
+
+            total_size += all_size;
+            offset++;
+	    }
+        else 
+        {
+	        continue;
+        }
+    }
+
+    closedir(dir);
     return 0;
 }
