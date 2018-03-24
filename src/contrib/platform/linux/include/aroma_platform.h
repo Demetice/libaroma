@@ -49,7 +49,7 @@
 #endif
 
 /* Android */
-#if ANDROID
+#if 1
   #ifdef LIBAROMA_CONFIG_SHMEM_PREFIX
     #undef LIBAROMA_CONFIG_SHMEM_PREFIX
   #endif

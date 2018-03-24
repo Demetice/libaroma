@@ -313,8 +313,11 @@ file(GLOB LIBAROMA_TEST_SRCS examples/recovery/*.c)
 include_directories(
   ${PROJECT_SOURCE_DIR}/examples/recovery
 )
-add_executable(libaroma_test ${LIBAROMA_TEST_SRCS})
-target_link_libraries(libaroma_test aroma)
+#add_executable(libaroma_test ${LIBAROMA_TEST_SRCS})
+#target_link_libraries(libaroma_test aroma)
 
 message("CFLAGS             : ${CMAKE_C_FLAGS}")
 message("CXXFLAGS           : ${CMAKE_CXX_FLAGS}")
+
+add_executable(png2ram main.c)
+target_link_libraries(png2ram aroma)
