@@ -18,12 +18,26 @@ typedef struct tagCanvasRamDataHdr
 
 int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name);
 int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh);
-int write_single_image_to_file(char *image_name, FILE *file_in, int *all_size);
 
 int main(int argc, char *argv[])
 {
-    char dir[] = "./";
-    
+    char *dir = NULL;
+
+    if (argc > 2)
+    {
+        printf("Usage: ./png2ram [dir] \n");
+        printf("\t if dir NULL use ./ \n");
+        return -1;
+    }
+    else if (argc == 2)
+    {
+        dir = argv[1];
+    }
+    else 
+    {
+        dir = "./";
+    }
+
     FILE *fcin = fopen("png_res.c", "w+");
     if (fcin == NULL)
     {
@@ -51,12 +65,12 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int write_single_image_to_file(char *image_name, FILE *file_in, int *all_size)
+int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, int *all_size)
 {
     LIBAROMA_STREAMP stream = NULL;
     LIBAROMA_CANVASP canvas = NULL;
 
-    stream = libaroma_stream_file(image_name);
+    stream = libaroma_stream_file(abs_name);
     if (stream == NULL)
     {
         printf("error in get image stream \r\n");
@@ -207,10 +221,12 @@ void fix_file_name_for_macro(const char *src, char *dst)
 
 int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
 {   
+    int ret = 0;
     DIR *dir;
     struct dirent *ptr;
     int offset = 0, total_size = 0, all_size = 0;
     char buffer[256];
+    char abs_dir[1024];
 
     if ((dir=opendir(basePath)) == NULL)
     {
@@ -226,8 +242,15 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
         }   
         else if(ptr->d_type == 8 && is_png_file(ptr->d_name))    ///file
         {
+            strncpy(abs_dir, basePath, 1024);
+            strcat(abs_dir, ptr->d_name);
+
 	        printf("%s start convert \n", ptr->d_name);
-            write_single_image_to_file(ptr->d_name, fc, &all_size);
+            ret = write_single_image_to_file(abs_dir, ptr->d_name, fc, &all_size);
+            if (ret != 0)
+            {
+                continue;
+            }
 
             fix_file_name_for_macro(ptr->d_name, buffer);
 
