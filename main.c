@@ -16,8 +16,8 @@ typedef struct tagCanvasRamDataHdr
     word l;            /* 图片一行的大小 */
 }LIBAROMA_CANVAS_FILE_HDR, *LIBAROMA_CANVAS_FILE_HDRP;
 
-int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name);
-int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh);
+int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name);
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbin);
 
 int main(int argc, char *argv[])
 {
@@ -38,14 +38,26 @@ int main(int argc, char *argv[])
         dir = "./";
     }
 
-    FILE *fcin = fopen("png_res.c", "w+");
+    char acfile[100];
+    char ahfile[100];
+    char adfile[100];
+
+    strcpy(acfile, dir);
+    strcpy(ahfile, dir);
+    strcpy(adfile, dir);
+
+    strcat(acfile, "\png_res.c");
+    strcat(ahfile, "\png_res.h");
+    strcat(adfile, "\png_res.raw");
+
+    FILE *fcin = fopen(acfile, "w+");
     if (fcin == NULL)
     {
         fprintf(stderr, "open png_res.c file failed\n");
         return -1;
     }
     
-    FILE *fh = fopen("png_res.h", "w+");
+    FILE *fh = fopen(ahfile, "w+");
     if (fh == NULL)
     {
         fprintf(stderr, "open png_res.h file failed\n");
@@ -53,19 +65,29 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    FILE *fbin = fopen(adfile, "wb+");
+    if (fbin == NULL)
+    {
+        fprintf(stderr, "open png_res.raw file failed\n");
+        fclose(fcin);
+        fclose(fh);
+        return -1;
+    }
+
     fprintf(fcin, "const char png_res[] = {\r\n");
 
-    read_dir_pngs_convert_ram_data(dir, fcin, fh);
+    read_dir_pngs_convert_ram_data(dir, fcin, fh, fbin);
 
     fprintf(fcin, "\r\n};\r\n");
     
     fclose(fcin);
     fclose(fh);
+    fclose(fbin);
 
     return 0;
 }
 
-int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, int *all_size)
+int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, FILE *fbin, int *all_size)
 {
     LIBAROMA_STREAMP stream = NULL;
     LIBAROMA_CANVASP canvas = NULL;
@@ -87,7 +109,7 @@ int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, 
     printf("load image success W:%d, h:%d, flag:%d, l:%d, s:%d\n", 
                 canvas->w, canvas->h, canvas->flags, canvas->l, canvas->s);
 
-    write_canvas_to_file(canvas, file_in, image_name);
+    write_canvas_to_file(canvas, file_in, fbin, image_name);
     
     int alpha_flag = (canvas->alpha == NULL) ? 0 : 1;
 
@@ -116,7 +138,7 @@ void construct_canvas_file_head(LIBAROMA_CANVASP canvas, LIBAROMA_CANVAS_FILE_HD
     return;
 }
 
-int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
+int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name)
 {
     LIBAROMA_CANVAS_FILE_HDR hdr = {0};
     bytep canvas_header = (bytep)&hdr;
@@ -127,15 +149,20 @@ int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
 
     for (int i = 0; i < sizeof(hdr); i++)
     {
-        fprintf(in, " %d,", canvas_header[i]);
+        fprintf(in, " %#02x,", canvas_header[i]);
+    }
+
+    if (fwrite(&hdr, sizeof(hdr), 1, fbin) != 1)
+    {
+        fprintf(stderr, "error in write fbin head\n");
     }
 
     return 0;
 }
 
-int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
+int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name)
 {
-    write_canvas_head_to_file(canvas, in, name);
+    write_canvas_head_to_file(canvas, in, fbin, name);
 
     /* 用于记录换行的 */
     int count = 0;
@@ -146,7 +173,7 @@ int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
     {
         for(int j = 0; j < canvas->w; j++)
         {
-            fprintf(in, " %d, %d,", data_char_type[count], data_char_type[count + 1]);
+            fprintf(in, " %#02x, %#02x,", data_char_type[count], data_char_type[count + 1]);
 
             if (((count + 1) % 16) == 15)
             {
@@ -155,6 +182,8 @@ int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
             count += 2;
         }
     }
+
+    fwrite(canvas->data, sizeof(word), canvas->s, fbin);
 
 
     if (canvas->alpha == NULL)
@@ -169,7 +198,7 @@ int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
     {
         for(int j = 0; j < canvas->w; j++)
         {
-            fprintf(in, " %d,", canvas->alpha[count]);
+            fprintf(in, " %#02x,", canvas->alpha[count]);
 
             if ((count % 16) == 15)
             {
@@ -179,6 +208,8 @@ int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, char *name)
             count ++;
         }
     }
+
+    fwrite(canvas->alpha, sizeof(byte), canvas->s, fbin);
 
     return 0;
 }
@@ -219,7 +250,7 @@ void fix_file_name_for_macro(const char *src, char *dst)
     return;
 }
 
-int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbin)
 {   
     int ret = 0;
     DIR *dir;
@@ -246,7 +277,7 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
             strcat(abs_dir, ptr->d_name);
 
 	        printf("%s start convert \n", ptr->d_name);
-            ret = write_single_image_to_file(abs_dir, ptr->d_name, fc, &all_size);
+            ret = write_single_image_to_file(abs_dir, ptr->d_name, fc, fbin, &all_size);
             if (ret != 0)
             {
                 continue;
@@ -254,8 +285,8 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh)
 
             fix_file_name_for_macro(ptr->d_name, buffer);
 
-            fprintf(fh, "#define RES_PNG_IDX_%s %d\n", buffer, offset);
-            fprintf(fh, "#define RES_PNG_OFFSET_%s %d\n", buffer, total_size);
+            fprintf(fh, "#define PACE_APP_CLK_RES_INDEX_%s %d\n", buffer, offset);
+    //        fprintf(fh, "#define RES_PNG_OFFSET_%s %d\n", buffer, total_size);
 
             total_size += all_size;
             offset++;
