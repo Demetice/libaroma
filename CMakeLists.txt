@@ -319,5 +319,5 @@ include_directories(
 message("CFLAGS             : ${CMAKE_C_FLAGS}")
 message("CXXFLAGS           : ${CMAKE_CXX_FLAGS}")
 
-add_executable(png2ram main.c)
-target_link_libraries(png2ram aroma)
+add_executable(png2raw main.c)
+target_link_libraries(png2raw aroma)

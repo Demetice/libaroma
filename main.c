@@ -19,6 +19,39 @@ typedef struct tagCanvasRamDataHdr
 int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name);
 int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbin);
 
+void get_mode_name_from_dir(const char *src, char *dst)
+{
+    int len = strlen(src);
+    int start = 0;
+    int fix_flag = 0;
+
+    dst[0] = '\0';
+
+    for (start = len - 2; start >= 0; start--)
+    {
+        if(src[start] == '/')
+        {
+            fix_flag = 1;
+            break;
+        }
+    }
+
+    start++;
+
+    if (fix_flag == 1)
+    {
+        int i = 0;
+        for (; start < len - 1; start++)
+        {
+            dst[i++] = src[start];
+        }
+        dst[i] = '\0';
+    }
+
+    return;
+}
+
+
 int main(int argc, char *argv[])
 {
     char *dir = NULL;
@@ -38,17 +71,26 @@ int main(int argc, char *argv[])
         dir = "./";
     }
 
-    char acfile[100];
-    char ahfile[100];
-    char adfile[100];
+    char acfile[256];
+    char ahfile[256];
+    char adfile[256];
+    char mode_name[256];
+
+    get_mode_name_from_dir(dir, mode_name);
 
     strcpy(acfile, dir);
     strcpy(ahfile, dir);
     strcpy(adfile, dir);
 
-    strcat(acfile, "\png_res.c");
-    strcat(ahfile, "\png_res.h");
-    strcat(adfile, "\png_res.raw");
+    strcat(acfile, mode_name);
+    strcat(ahfile, mode_name);
+    strcat(adfile, mode_name);
+
+    strcat(acfile, "_png_res.c");
+    strcat(ahfile, "_png_res.h");
+    strcat(adfile, "_png_res.raw");
+
+    printf("dir:%s  mode:%s\n", dir, mode_name);
 
     FILE *fcin = fopen(acfile, "w+");
     if (fcin == NULL)
@@ -255,9 +297,10 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbi
     int ret = 0;
     DIR *dir;
     struct dirent *ptr;
-    int offset = 0, total_size = 0, all_size = 0;
+    dword offset = 0, total_size = 0, all_size = 0;
     char buffer[256];
     char abs_dir[1024];
+    dword array_offset[2048] = {0};
 
     if ((dir=opendir(basePath)) == NULL)
     {
@@ -285,8 +328,10 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbi
 
             fix_file_name_for_macro(ptr->d_name, buffer);
 
-            fprintf(fh, "#define PACE_APP_CLK_RES_INDEX_%s %d\n", buffer, offset);
-    //        fprintf(fh, "#define RES_PNG_OFFSET_%s %d\n", buffer, total_size);
+            fprintf(fh, "#define RES_INDEX_%s %d\n", buffer, offset);
+//            fprintf(fh, "#define RES_OFFSET_%s %d\n", buffer, total_size);
+
+            array_offset[offset] = total_size;
 
             total_size += all_size;
             offset++;
@@ -296,6 +341,17 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbi
 	        continue;
         }
     }
+
+    fprintf(fh, "\r\nconst unsigned long g_res_offset[%d] = {\r\n", offset);
+    for (int i = 0; i < offset; i++)
+    {
+        fprintf(fh, " %d,", array_offset[i]);
+        if (i % 16 == 15)
+        {
+            fprintf(fh, "\r\n");
+        } 
+    }
+    fprintf(fh, "\r\n};\r\n");
 
     closedir(dir);
     return 0;
