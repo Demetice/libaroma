@@ -16,8 +16,8 @@ typedef struct tagCanvasRamDataHdr
     word l;            /* 图片一行的大小 */
 }LIBAROMA_CANVAS_FILE_HDR, *LIBAROMA_CANVAS_FILE_HDRP;
 
-int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name);
-int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbin);
+int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *fbin, char *name);
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fh);
 
 void get_mode_name_from_dir(const char *src, char *dst)
 {
@@ -71,65 +71,34 @@ int main(int argc, char *argv[])
         dir = "./";
     }
 
-    char acfile[256];
     char ahfile[256];
-    char adfile[256];
     char mode_name[256];
 
     get_mode_name_from_dir(dir, mode_name);
 
-    strcpy(acfile, dir);
     strcpy(ahfile, dir);
-    strcpy(adfile, dir);
-
-    strcat(acfile, mode_name);
     strcat(ahfile, mode_name);
-    strcat(adfile, mode_name);
-
-    strcat(acfile, "_png_res.c");
     strcat(ahfile, "_png_res.h");
-    strcat(adfile, "_png_res.raw");
 
     printf("dir:%s  mode:%s\n", dir, mode_name);
-
-    FILE *fcin = fopen(acfile, "w+");
-    if (fcin == NULL)
-    {
-        fprintf(stderr, "open png_res.c file failed\n");
-        return -1;
-    }
     
     FILE *fh = fopen(ahfile, "w+");
     if (fh == NULL)
     {
         fprintf(stderr, "open png_res.h file failed\n");
-        fclose(fcin);
         return -1;
     }
 
-    FILE *fbin = fopen(adfile, "wb+");
-    if (fbin == NULL)
-    {
-        fprintf(stderr, "open png_res.raw file failed\n");
-        fclose(fcin);
-        fclose(fh);
-        return -1;
-    }
 
-    fprintf(fcin, "const char png_res[] = {\r\n");
+    read_dir_pngs_convert_ram_data(dir, fh);
 
-    read_dir_pngs_convert_ram_data(dir, fcin, fh, fbin);
-
-    fprintf(fcin, "\r\n};\r\n");
-    
-    fclose(fcin);
     fclose(fh);
-    fclose(fbin);
+
 
     return 0;
 }
 
-int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, FILE *fbin, int *all_size)
+int write_single_image_to_file(char *abs_name, char *image_name, FILE *fbin, int *all_size)
 {
     LIBAROMA_STREAMP stream = NULL;
     LIBAROMA_CANVASP canvas = NULL;
@@ -151,7 +120,7 @@ int write_single_image_to_file(char *abs_name, char *image_name, FILE *file_in, 
     printf("load image success W:%d, h:%d, flag:%d, l:%d, s:%d\n", 
                 canvas->w, canvas->h, canvas->flags, canvas->l, canvas->s);
 
-    write_canvas_to_file(canvas, file_in, fbin, image_name);
+    write_canvas_to_file(canvas, fbin, image_name);
     
     int alpha_flag = (canvas->alpha == NULL) ? 0 : 1;
 
@@ -180,19 +149,12 @@ void construct_canvas_file_head(LIBAROMA_CANVASP canvas, LIBAROMA_CANVAS_FILE_HD
     return;
 }
 
-int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name)
+int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *fbin, char *name)
 {
     LIBAROMA_CANVAS_FILE_HDR hdr = {0};
     bytep canvas_header = (bytep)&hdr;
     
     construct_canvas_file_head(canvas, &hdr);
-    
-    fprintf(in, "\r\n /* %s image header  */ \r\n", name);
-
-    for (int i = 0; i < sizeof(hdr); i++)
-    {
-        fprintf(in, " %#02x,", canvas_header[i]);
-    }
 
     if (fwrite(&hdr, sizeof(hdr), 1, fbin) != 1)
     {
@@ -202,53 +164,16 @@ int write_canvas_head_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, cha
     return 0;
 }
 
-int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *in, FILE *fbin, char *name)
+int write_canvas_to_file(LIBAROMA_CANVASP canvas, FILE *fbin, char *name)
 {
-    write_canvas_head_to_file(canvas, in, fbin, name);
-
-    /* 用于记录换行的 */
-    int count = 0;
+    write_canvas_head_to_file(canvas, fbin, name);
     unsigned char *data_char_type = (unsigned char *)canvas->data;
 
-    fprintf(in, "\r\n /* %s image data */ \r\n", name);
-    for(int i = 0; i < canvas->h; i++)
-    {
-        for(int j = 0; j < canvas->w; j++)
-        {
-            fprintf(in, " %#02x, %#02x,", data_char_type[count], data_char_type[count + 1]);
-
-            if (((count + 1) % 16) == 15)
-            {
-                fprintf(in, "\r\n");
-            }
-            count += 2;
-        }
-    }
-
     fwrite(canvas->data, sizeof(word), canvas->s, fbin);
-
 
     if (canvas->alpha == NULL)
     {
         return 0;
-    }
-
-    fprintf(in, "\r\n /* %s alpha data */ \r\n", name);
-    count = 0;
-
-    for(int i = 0; i < canvas->h; i++)
-    {
-        for(int j = 0; j < canvas->w; j++)
-        {
-            fprintf(in, " %#02x,", canvas->alpha[count]);
-
-            if ((count % 16) == 15)
-            {
-                fprintf(in, "\r\n");
-            }
-
-            count ++;
-        }
     }
 
     fwrite(canvas->alpha, sizeof(byte), canvas->s, fbin);
@@ -292,7 +217,7 @@ void fix_file_name_for_macro(const char *src, char *dst)
     return;
 }
 
-int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbin)
+int read_dir_pngs_convert_ram_data(char *basePath, FILE *fh)
 {   
     int ret = 0;
     DIR *dir;
@@ -316,25 +241,50 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fc, FILE *fh, FILE *fbi
         }   
         else if(ptr->d_type == 8 && is_png_file(ptr->d_name))    ///file
         {
+            char aFileName[1024];
+
+            strncpy(aFileName, basePath, 1024);
+            strcat(aFileName, "raw/");
+            strcat(aFileName, ptr->d_name);
+
+            int len = strlen(aFileName);
+            aFileName[len - 4] = '.';
+            aFileName[len - 3] = 'r';
+            aFileName[len - 2] = 'a';
+            aFileName[len - 1] = 'w';
+            aFileName[len] = '\0';
+
+            printf("\r\n %s \r\n",aFileName);
+
+            FILE *fbin = fopen(aFileName, "w+");
+            if (fh == NULL)
+            {
+                fprintf(stderr, "open png_res.h file failed\n");
+                continue;
+            }
+
             strncpy(abs_dir, basePath, 1024);
             strcat(abs_dir, ptr->d_name);
 
 	        printf("%s start convert \n", ptr->d_name);
-            ret = write_single_image_to_file(abs_dir, ptr->d_name, fc, fbin, &all_size);
+            ret = write_single_image_to_file(abs_dir, ptr->d_name, fbin, &all_size);
             if (ret != 0)
             {
+                fclose(fbin);
                 continue;
             }
 
             fix_file_name_for_macro(ptr->d_name, buffer);
 
             fprintf(fh, "#define RES_INDEX_%s %d\n", buffer, offset);
-//            fprintf(fh, "#define RES_OFFSET_%s %d\n", buffer, total_size);
+            //            fprintf(fh, "#define RES_OFFSET_%s %d\n", buffer, total_size);
 
             array_offset[offset] = total_size;
 
             total_size += all_size;
             offset++;
+
+            fclose(fbin);
 	    }
         else 
         {
