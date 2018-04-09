@@ -110,7 +110,7 @@ int write_single_image_to_file(char *abs_name, char *image_name, FILE *fbin, int
         return -2;
     }
 
-    canvas = libaroma_image_ex(stream, 1, 0);
+    canvas = libaroma_image_ex(stream, 1, 1);
     if (canvas == NULL)
     {
         printf("get canvas error \r\n");
@@ -244,7 +244,6 @@ int read_dir_pngs_convert_ram_data(char *basePath, FILE *fh)
             char aFileName[1024];
 
             strncpy(aFileName, basePath, 1024);
-            strcat(aFileName, "raw/");
             strcat(aFileName, ptr->d_name);
 
             int len = strlen(aFileName);
