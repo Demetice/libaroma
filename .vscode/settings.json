@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "aroma.h": "c",
+        "core.h": "c",
+        "*.ipp": "c",
+        "typeinfo": "c",
+        "array": "c"
+    }
+}

@@ -1,14 +1,4 @@
-/********************************************************************[libaroma]*
- * Copyright (C) 2011-2015 Ahmad Amarullah (http://amarullz.com/)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+/*
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -33,7 +23,7 @@
 LIBAROMA_IARRAYP libaroma_iarray(
     LIBAROMA_ARRAY_FREE_CB cb){
   /* Allocating Memory */
-  LIBAROMA_IARRAYP a = (LIBAROMA_IARRAYP) malloc(sizeof(LIBAROMA_IARRAY));
+  LIBAROMA_IARRAYP a = (LIBAROMA_IARRAYP) pvPortMalloc(sizeof(LIBAROMA_IARRAY));
   a->first  = NULL;
   a->last   = NULL;
   a->n      = 0;
@@ -72,8 +62,9 @@ byte libaroma_iarray_set_ex(
     }
     
     free(item->val);
-    item->val = malloc(strlen(val) + 1);
-    strcpy(item->val, val);
+    item->val = malloc(sz);
+    if(item->val)
+    memcpy(item->val, val, sz);
     return 1;
   }
   item      = malloc(sizeof(LIBAROMA_IARRAY_ITEM));
@@ -218,7 +209,7 @@ byte libaroma_iarray_delete(
       }
       
       free(item->val);
-      free(item);
+      vPortFree(item);
       return 1;
     }
     
@@ -248,9 +239,9 @@ byte libaroma_iarray_free(
     free(item->val);
     tmp_item = item;
     item = item->next;
-    free(tmp_item);
+    vPortFree(tmp_item);
   }
-  free(a);
+  vPortFree(a);
   return 1;
 } /* End of libaroma_iarray_free */
 
@@ -261,7 +252,7 @@ byte libaroma_iarray_free(
  */
 LIBAROMA_SARRAYP libaroma_sarray(
     LIBAROMA_ARRAY_FREE_CB cb) {
-  LIBAROMA_SARRAYP a = (LIBAROMA_SARRAYP) malloc(sizeof(LIBAROMA_SARRAY));
+  LIBAROMA_SARRAYP a = (LIBAROMA_SARRAYP) pvPortMalloc(sizeof(LIBAROMA_SARRAY));
   a->first  = NULL;
   a->last   = NULL;
   a->n      = 0;
@@ -303,15 +294,15 @@ byte libaroma_sarray_set(
       }
     }
     free(item->val);
-    item->val = malloc(strlen(val) + 1);
+    item->val = pvPortMalloc(strlen(val) + 1);
     strcpy(item->val, val);
     return 1;
   }
   /* Allocating New Item */
-  item      = malloc(sizeof(LIBAROMA_SARRAY_ITEM));
-  item->key = malloc(strlen(key) + 1);
+  item      = pvPortMalloc(sizeof(LIBAROMA_SARRAY_ITEM));
+  item->key = pvPortMalloc(strlen(key) + 1);
   item->hash = hash;
-  item->val = malloc(sz);
+  item->val = pvPortMalloc(sz);
   item->next = NULL;
   strcpy(item->key, key);
   memcpy(item->val, val, sz);
@@ -416,9 +407,9 @@ byte libaroma_sarray_delete(
         if (a->cb != NULL) {
           a->cb(item->val);
         }
-        free(item->val);
-        free(item->key);
-        free(item);
+        vPortFree(item->val);
+        vPortFree(item->key);
+        vPortFree(item);
         return 1;
       }
     }
@@ -444,13 +435,13 @@ byte libaroma_sarray_free(
     if (a->cb != NULL) {
       a->cb(item->val);
     }
-    free(item->val);
-    free(item->key);
+    vPortFree(item->val);
+    vPortFree(item->key);
     tmp_item = item;
     item = item->next;
-    free(tmp_item);
+    vPortFree(tmp_item);
   }
-  free(a);
+  vPortFree(a);
   return 1;
 } /* End of libaroma_sarray_free */
 
@@ -461,7 +452,7 @@ byte libaroma_sarray_free(
  */
 LIBAROMA_STACKP libaroma_stack(
     LIBAROMA_ARRAY_FREE_CB cb) {
-  LIBAROMA_STACKP a = (LIBAROMA_STACKP) malloc(sizeof(LIBAROMA_STACK));
+  LIBAROMA_STACKP a = (LIBAROMA_STACKP) pvPortMalloc(sizeof(LIBAROMA_STACK));
   a->first  = NULL;
   a->last   = NULL;
   a->n      = 0;
@@ -481,8 +472,8 @@ byte libaroma_stack_push(
   if (!a || !val || (sz == 0)) {
     return 0;
   }
-  LIBAROMA_STACK_ITEMP item = malloc(sizeof(LIBAROMA_STACK_ITEM));
-  item->val = malloc(sz);
+  LIBAROMA_STACK_ITEMP item = pvPortMalloc(sizeof(LIBAROMA_STACK_ITEM));
+  item->val = pvPortMalloc(sz);
   item->next = NULL;
   item->prev = a->last;
   memcpy(item->val, val, sz);
@@ -519,12 +510,17 @@ voidp libaroma_stack_shift(
     a->last = NULL;
   }
   else {
-    a->first          = first->next;
+    a->first = first->next;
+    if (a->first->next != NULL)
+    {
+        //双向链表两个方向都要维护
+        a->first->next->prev = a->first;
+    }
   }
   
   a->n--;
   voidp ret           = first->val;
-  free(first);
+  vPortFree(first);
   return ret;
 } /* End of libaroma_stack_shift */
 
@@ -557,11 +553,12 @@ voidp libaroma_stack_pop(
     a->last = NULL;
   }
   else {
-    a->last           = last->prev;
+    a->last       = last->prev;
+    a->last->next = NULL; /* 双向链表两个方向都要维护 */
   }
   voidp ret           = last->val;
   a->n--;
-  free(last);
+  vPortFree(last);
   return ret;
 } /* End of libaroma_stack_pop */
 
@@ -600,8 +597,8 @@ byte libaroma_stack_unshift(
   }
   
   /* Init Item */
-  LIBAROMA_STACK_ITEMP item = malloc(sizeof(LIBAROMA_STACK_ITEM));
-  item->val = malloc(sz);
+  LIBAROMA_STACK_ITEMP item = pvPortMalloc(sizeof(LIBAROMA_STACK_ITEM));
+  item->val = pvPortMalloc(sz);
   item->next = a->first;
   item->prev = NULL;
   memcpy(item->val, val, sz);
@@ -610,7 +607,8 @@ byte libaroma_stack_unshift(
     a->first = item;
     a->last = item;
     return 1;
-  }
+  }  
+  a->first->prev = item;
   a->first = item;
   return 1;
 } /* End of libaroma_stack_unshift */
@@ -720,8 +718,8 @@ byte libaroma_stack_item_set(
       ag->cb(a->val);
     }
   }
-  free(a->val);
-  a->val = malloc(sz);
+  vPortFree(a->val);
+  a->val = pvPortMalloc(sz);
   memcpy(a->val, val, sz);
   return 1;
 } /* End of libaroma_stack_item_set */
@@ -775,6 +773,17 @@ byte libaroma_stack_item_delete(
     LIBAROMA_STACK_ITEMP next = ai->next;
     next->prev = ai->prev;
   }
+
+  if (afist != NULL)
+  {
+    afist->prev = NULL;
+  }
+
+  if (alast != NULL)
+  {
+    alast->next = NULL;
+  }
+  
   a->first = afist;
   a->last  = alast;
   a->n--;
@@ -782,8 +791,11 @@ byte libaroma_stack_item_delete(
   if (a->cb != NULL) {
     a->cb(ai->val);
   }
-  free(ai->val);
-  free(ai);
+  if(ai->val)
+  {
+	  vPortFree(ai->val);
+  }
+  vPortFree(ai);
   return 1;
 } /* End of libaroma_stack_item_delete */
 
@@ -826,7 +838,7 @@ LIBAROMA_STACK_ITEMP libaroma_stack_at(
     return NULL;
   }
   /* Find Faster Loop */
-  int half = a->n << 1;
+  int half = a->n >> 1;
   LIBAROMA_STACK_ITEMP find = NULL;
   int posfind = 0;
   if (pos <= half) {
@@ -956,8 +968,8 @@ byte libaroma_stack_add_at(
   }
   /* Init Item */
   LIBAROMA_STACK_ITEMP prev = find->prev;
-  LIBAROMA_STACK_ITEMP item = malloc(sizeof(LIBAROMA_STACK_ITEM));
-  item->val = malloc(sz);
+  LIBAROMA_STACK_ITEMP item = pvPortMalloc(sizeof(LIBAROMA_STACK_ITEM));
+  item->val = pvPortMalloc(sz);
   item->next = find;
   item->prev = find->prev;
   find->prev = item;
@@ -996,13 +1008,13 @@ byte libaroma_stack_free(
       a->cb(item->val);
     }
     
-    free(item->val);
+    vPortFree(item->val);
     tmp_item = item;
     item = item->next;
-    free(tmp_item);
+    vPortFree(tmp_item);
     a->n--;
   }
-  free(a);
+  vPortFree(a);
   return 1;
 } /* End of libaroma_stack_free */
 
