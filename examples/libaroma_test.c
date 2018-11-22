@@ -54,7 +54,7 @@ void init_libaroma(){
   /* load font - id=0 */
   libaroma_font(0,
     libaroma_stream(
-      "file:///sdcard/Roboto-Regular.ttf"
+      "file://examples/recovery/res/fonts/Roboto-Regular.ttf"
     )
   );
 } /* End of init_libaroma */
@@ -73,12 +73,12 @@ int main(int argc, char **argv){
   
   init_libaroma();
   
-  // tab_test();
+  tab_test();
   
   bar_test();
   
   /* start common test */
-  // common_test();
+  common_test();
   
   /* end libaroma process */
   libaroma_end();

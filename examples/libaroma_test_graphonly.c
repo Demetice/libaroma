@@ -551,7 +551,7 @@ int MenuShowDialog(
 
 
 
-int main(int argc, char **argv){
+int main2(int argc, char **argv){
   if (init_aroma()){
     int i;
     int statusbar_height = libaroma_dp(24);

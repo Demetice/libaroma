@@ -20,7 +20,7 @@ void tab_test(){
   );
   
   LIBAROMA_WINDOWP win2 = libaroma_ctl_pager_get_window(pager);
-  /*
+  //*
   LIBAROMA_CONTROLP tabs=libaroma_ctl_tabs(
     win,
     111,
@@ -44,7 +44,7 @@ void tab_test(){
   };
   libaroma_ctl_tabs_set_texts(
     tabs,tab_texts,10,0);
-  */
+  //*/
   int pw = libaroma_px(pager->w);
   LIBAROMA_CONTROLP btn6 = libaroma_ctl_button(
     win2, 5,
@@ -87,7 +87,7 @@ void tab_test(){
   );
   
   LIBAROMA_CANVASP list_icon =
-    libaroma_image_uri("file:///sdcard/ic_settings_data_usage.png");
+    libaroma_image_uri("file://examples/recovery/res/ico/settings.png");
   char main_text[256];
   char extra_text[256];
   int itm=0;

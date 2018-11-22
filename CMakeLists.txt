@@ -309,7 +309,7 @@ if (DEFINED WITHAROMART)
 endif()
 
 # libaroma_test
-file(GLOB LIBAROMA_TEST_SRCS examples/recovery/*.c)
+file(GLOB LIBAROMA_TEST_SRCS examples/*.c)
 include_directories(
   ${PROJECT_SOURCE_DIR}/examples/recovery
 )
