@@ -15,6 +15,9 @@
 #define __libaroma_array_c__
 #include <aroma_internal.h>
 
+#define vPortFree free
+#define pvPortMalloc malloc
+
 /*
  * Function    : libaroma_iarray
  * Return Value: LIBAROMA_IARRAYP
