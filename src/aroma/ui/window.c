@@ -585,13 +585,13 @@ byte libaroma_window_del(
   int i;
   for (i=0;i<win->childn;i++){
     if (win->childs[i]!=ctl){
-      newchilds[j++]=win->childs[i];
-      if (j==win->childn-2){
+      if (j==win->childn-1){
         /* current ctl not found */
         free(newchilds);
         ALOGW("window_del ctl not found in window");
         return 0;
       }
+      newchilds[j++]=win->childs[i];
     }
   }
   free(win->childs);

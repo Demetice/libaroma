@@ -6,3 +6,6 @@ install_manifest.txt
 
 /build
 .vscode
+*.i
+*.ii
+*.s

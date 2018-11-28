@@ -4,6 +4,9 @@
         "core.h": "c",
         "*.ipp": "c",
         "typeinfo": "c",
-        "array": "c"
+        "array": "c",
+        "aroma_internal.h": "c",
+        "ui_internal.h": "c",
+        "ui.h": "c"
     }
 }

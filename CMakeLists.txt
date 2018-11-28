@@ -123,7 +123,7 @@ else()
 endif()
 
 # release&debug flags
-set(CMAKE_C_FLAGS_RELEASE "-O3 -ftree-vectorize -fprefetch-loop-arrays -funsafe-math-optimizations")
+set(CMAKE_C_FLAGS_RELEASE "-O0 -g -ggdb -ftree-vectorize -fprefetch-loop-arrays -funsafe-math-optimizations")
 set(CMAKE_C_FLAGS_DEBUG "-ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")

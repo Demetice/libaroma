@@ -106,7 +106,7 @@ typedef struct{
  * Return Value: int 
  * Descriptions: get window index
  */
-inline int _libaroma_ctl_fragment_get_win_index(
+int _libaroma_ctl_fragment_get_win_index(
     _LIBAROMA_CTL_FRAGMENTP me,
     LIBAROMA_WINDOWP win){
   int i;
